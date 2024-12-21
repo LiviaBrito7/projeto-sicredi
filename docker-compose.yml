@@ -1,13 +1,13 @@
-services:
-  projeto-sicredi:
-    image: mysql:9.1
-    container_name: projeto-sicredi
-    env_file:
-      - ./backend/.env
-    ports:
-      - "3306:3306"
-    volumes:
-      - projeto-sicredi-data:/var/lib/mysql
+# services:
+#   projeto-sicredi:
+#     image: mysql:9.1
+#     container_name: projeto-sicredi
+#     env_file:
+#       - ./backend/.env
+#     ports:
+#       - "3306:3306"
+#     volumes:
+#       - projeto-sicredi-data:/var/lib/mysql
 
-volumes:
-  projeto-sicredi-data:
+# volumes:
+#   projeto-sicredi-data:
