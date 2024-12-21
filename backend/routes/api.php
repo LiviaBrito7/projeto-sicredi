@@ -15,4 +15,4 @@ Route::post('/processar/etl', function (Illuminate\Http\Request $request) {
 });
 
 Route::post('/upload', [FileUploadController::class, 'upload']);
-Route::get('/metrics', [MetricsController::class, 'index']);
+Route::get('/metrics', [MetricsController::class, 'getMetrics']);
