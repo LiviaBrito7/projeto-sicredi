@@ -10,47 +10,88 @@ use Illuminate\Support\Facades\Log;
 class FileUploadController extends Controller
 {
     public function upload(Request $request)
-    {
-        $file = $request->file('file');
+{
+    // Validação dos dados recebidos
+    $request->validate([
+        'file' => 'required|file|max:2048000', // Limite de 2GB
+        'chunk' => 'required|integer',
+        'totalChunks' => 'required|integer',
+        'original_name' => 'required|string',
+    ]);
 
-        Log::info('Iniciando upload de arquivo', [
-            'nome' => $file->getClientOriginalName(),
-            'tamanho' => $file->getSize()
+    // Obter informações do arquivo
+    $chunkIndex = $request->input('chunk');
+    $totalChunks = $request->input('totalChunks');
+    $originalName = $request->input('original_name');
+
+    // Armazenar o chunk
+    $chunkPath = $chunkIndex . '-' . $originalName; // Apenas o nome do arquivo
+    $request->file('file')->storeAs('uploads/chunks', $chunkPath); // O Laravel adiciona o caminho base
+
+    Log::info('Chunk armazenado', [
+        'chunk' => $chunkIndex,
+        'original_name' => $originalName,
+        'path' => 'uploads/chunks/' . $chunkPath // Log para verificar o caminho
+    ]);
+
+    // Verificar se todos os chunks foram enviados
+    if ($chunkIndex == $totalChunks - 1) {
+        // Combinar os chunks em um único arquivo
+        Log::info('Todos os chunks recebidos, iniciando a combinação.');
+        $this->combineChunks($originalName, $totalChunks);
+    } else {
+        Log::info('Chunk recebido com sucesso', [
+            'chunk' => $chunkIndex,
+            'totalChunks' => $totalChunks
         ]);
-
-        $path = $file->store('uploads');
-        Log::info('Arquivo armazenado em', ['path' => $path]);
-
-        $fileUpload = FileUpload::create([
-            'original_name' => $file->getClientOriginalName(),
-            'path' => $path,
-            'size' => $file->getSize(),
-            'status' => 'pending'
-        ]);
-
-        return response()->json($fileUpload);
     }
 
-    public function process($id)
-    {
-        $fileUpload = FileUpload::findOrFail($id);
+    return response()->json(['status' => 'success']);
+}
 
-        Log::info('Iniciando processamento ETL', [
-            'file_id' => $id
-        ]);
+private function combineChunks($originalFileName, $totalChunks)
+{
+    $finalFileName = pathinfo($originalFileName, PATHINFO_FILENAME) . '.prn';
+    $finalPath = 'uploads/' . $finalFileName;
+    $finalFile = fopen(storage_path('app/' . $finalPath), 'wb');
 
-        // Aqui vai a lógica de processamento do arquivo
-        // Implementar o processamento em chunks para arquivos grandes
+    Log::info('Iniciando a combinação dos chunks', [
+        'original_name' => $originalFileName,
+        'final_name' => $finalFileName,
+        'totalChunks' => $totalChunks
+    ]);
 
-        $fileUpload->update([
-            'status' => 'processed',
-            'processed_at' => now()
-        ]);
+    for ($i = 0; $i < $totalChunks; $i++) {
+        $chunkPath = storage_path('app/uploads/chunks/' . $i . '-' . $originalFileName);
+        Log::info('Verificando chunk', ['path' => $chunkPath]); // Log para verificar o caminho
 
-        Log::info('Processamento ETL finalizado', [
-            'file_id' => $id
-        ]);
-
-        return response()->json(['message' => 'Arquivo processado com sucesso']);
+        if (file_exists($chunkPath)) {
+            $chunk = fopen($chunkPath, 'rb');
+            stream_copy_to_stream($chunk, $finalFile);
+            fclose($chunk);
+            unlink($chunkPath);
+            Log::info('Chunk combinado', [
+                'chunk' => $i,
+                'path' => $chunkPath
+            ]);
+        } else {
+            Log::warning('Chunk não encontrado', [
+                'chunk' => $i,
+                'path' => $chunkPath
+            ]);
+        }
     }
+
+    fclose($finalFile);
+
+    // Salvar informações no banco de dados
+    FileUpload::create([
+        'original_name' => $finalFileName,
+        'path' => $finalPath,
+        'size' => filesize(storage_path('app/' . $finalPath)),
+        'status' => 'completed'
+    ]);
+
+    Log::info('Arquivo combinado e salvo', ['path' => $finalPath]);
+}
 }

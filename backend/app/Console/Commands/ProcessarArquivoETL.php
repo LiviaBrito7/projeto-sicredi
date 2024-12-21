@@ -17,7 +17,6 @@ class ProcessarArquivoETL extends Command
         $filename = $this->argument('filename');
         $filePath = storage_path("app/uploads/{$filename}");
 
-        // Log de início do processamento
         Log::create([
             'acao' => 'Início do processamento',
             'detalhes' => "Processando o arquivo: {$filename}",
@@ -33,66 +32,87 @@ class ProcessarArquivoETL extends Command
         }
 
         $file = fopen($filePath, 'r');
-        $headerSkipped = false;
-        $lineNumber = 0; // Para rastrear o número da linha
+        $currentOrigin = null;
+        $lineNumber = 0;
+        $pendingMovimentacao = null;
 
         while (($line = fgets($file)) !== false) {
             $lineNumber++;
 
-            // Ignorar linhas de cabeçalho
-            if (!$headerSkipped) {
-                if (strpos($line, 'Origem') !== false) {
-                    $headerSkipped = true;
-                }
+            // Ignorar cabeçalhos e linhas desnecessárias
+            if (preg_match('/^={3,}|-{3,}|COOP CRED|^Pagina|^Total UA:|Data\/Hora/', trim($line))) {
                 continue;
             }
 
-            // Regex ajustado para capturar os dados
-            if (preg_match('/^(\d{4}\/\d{2})\s+(\d{5}-\d{1})\s+(.+?)\s+(\d+)\s+(.+?)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)\s+(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/', $line, $matches)) {
-                $origem = trim($matches[1]);
-                list($cooperativa, $agencia) = explode('/', $origem);
+            // Captura da origem (exemplo: 0000/19)
+            if (preg_match('/^(\d{4}\/\d{2})/', trim($line), $matches)) {
+                $currentOrigin = $matches[1];
+                continue;
+            }
 
-                // Log dos dados que estão sendo inseridos
-                Log::create([
-                    'acao' => 'Processando linha',
-                    'detalhes' => "Linha {$lineNumber}: " . json_encode([
-                        'cooperativa' => trim($cooperativa),
-                        'agencia' => trim($agencia),
-                        'conta' => trim($matches[2]),
-                        'nome' => trim($matches[3]),
-                        'documento' => trim($matches[4]),
-                        'codigo' => trim($matches[5]),
-                        'descricao' => trim($matches[6]),
-                        'debito' => str_replace(',', '.', str_replace('.', '', trim($matches[7]))),
-                        'credito' => str_replace(',', '.', str_replace('.', '', trim($matches[8]))),
-                        'data_hora' => Carbon::createFromFormat('d/m/Y H:i', trim($matches[9])),
-                    ]),
-                ]);
-
-                // Tente inserir os dados e registre o resultado
-                try {
-                    Movimentacao::create([
-                        'cooperativa' => trim($cooperativa),
-                        'agencia' => trim($agencia),
-                        'conta' => trim($matches[2]),
-                        'nome' => trim($matches[3]),
-                        'documento' => trim($matches[4]),
-                        'codigo' => trim($matches[5]),
-                        ' descricao' => trim($matches[6]),
-                        'debito' => str_replace(',', '.', str_replace('.', '', trim($matches[7]))),
-                        'credito' => str_replace(',', '.', str_replace('.', '', trim($matches[8]))),
-                        'data_hora' => Carbon::createFromFormat('d/m/Y H:i', trim($matches[9])),
-                    ]);
-                } catch (\Exception $e) {
-                    Log::create([
-                        'acao' => 'Erro na inserção',
-                        'detalhes' => "Linha {$lineNumber} falhou: " . $e->getMessage(),
-                    ]);
+            // Captura dos dados da movimentação
+            if (preg_match('/^\s*(\d{5}-\d)\s+(.+?)\s+(\S+)\s+(\S+)\s+(.+?)\s+([\d,.]+)?\s*([\d,.]+)?\s+(\d+)\s*$/', $line, $matches)) {
+                // Se houver uma movimentação pendente, salva ela primeiro
+                if ($pendingMovimentacao) {
+                    $this->salvarMovimentacao($pendingMovimentacao);
                 }
+
+                $pendingMovimentacao = [
+                    'cooperativa' => $currentOrigin ? explode('/', $currentOrigin)[0] : null,
+                    'agencia' => $currentOrigin ? explode('/', $currentOrigin)[1] : null,
+                    'conta' => trim($matches[1]),
+                    'nome' => trim($matches[2]),
+                    'documento' => trim($matches[3]),
+                    'codigo' => trim($matches[4]),
+                    'descricao' => trim($matches[5]),
+                    'debito' => isset($matches[6]) ? $this->formatarValor($matches[6]) : null,
+                    'credito' => isset($matches[7]) ? $this->formatarValor($matches[7]) : null,
+                    'id_mov' => trim($matches[8]),
+                    'data_hora' => null
+                ];
+            }
+            // Captura da data/hora que está na linha seguinte
+            elseif ($pendingMovimentacao && preg_match('/^\s+(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/', trim($line), $matches)) {
+                $pendingMovimentacao['data_hora'] = Carbon::createFromFormat('d/m/Y H:i', trim($matches[1]));
+                $this->salvarMovimentacao($pendingMovimentacao);
+                $pendingMovimentacao = null;
             }
         }
 
+        // Salvar última movimentação pendente se houver
+        if ($pendingMovimentacao) {
+            $this->salvarMovimentacao($pendingMovimentacao);
+        }
+
         fclose($file);
+
+        Log::create([
+            'acao' => 'Fim do processamento',
+            'detalhes' => "Processamento do arquivo {$filename} concluído.",
+        ]);
+
         $this->info("Processamento do arquivo {$filename} concluído.");
+    }
+
+    private function formatarValor($valor)
+    {
+        return floatval(str_replace(',', '.', str_replace('.', '', $valor)));
+    }
+
+    private function salvarMovimentacao($data)
+    {
+        try {
+            Log::create([
+                'acao' => 'Processando movimentação',
+                'detalhes' => json_encode($data),
+            ]);
+
+            Movimentacao::create($data);
+        } catch (\Exception $e) {
+            Log::create([
+                'acao' => 'Erro na inserção',
+                'detalhes' => "Erro ao inserir movimentação: " . $e->getMessage(),
+            ]);
+        }
     }
 }

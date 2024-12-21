@@ -14,6 +14,7 @@ instance.interceptors.response.use(
     console.error('Erro na requisição:', error);
     return Promise.reject(error);
   }
+
 );
 
 export default instance;
