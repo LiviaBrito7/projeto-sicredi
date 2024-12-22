@@ -34,61 +34,66 @@ class ProcessarArquivoETL extends Command
         $file = fopen($filePath, 'r');
         $currentOrigin = null;
         $lineNumber = 0;
-        $pendingMovimentacao = null;
 
         while (($line = fgets($file)) !== false) {
             $lineNumber++;
+            $line = trim($line);
 
             // Ignorar cabeçalhos e linhas desnecessárias
-            if (preg_match('/^={3,}|-{3,}|COOP CRED|^Pagina|^Total UA:|Data\/Hora/', trim($line))) {
+            if (preg_match('/^={3,}|-{3,}|COOP CRED|^Pagina|^Total UA:|Data\/Hora/', $line)) {
                 continue;
             }
 
             // Captura da origem (exemplo: 0000/19)
-            if (preg_match('/^(\d{4}\/\d{2})/', trim($line), $matches)) {
+            if (preg_match('/^(\d{4}\/\d{2})/', $line, $matches)) {
                 $currentOrigin = $matches[1];
                 continue;
             }
 
             // Captura dos dados da movimentação
             if (preg_match('/^\s*(\d{5}-\d)\s+(.{25})\s+(\d+)\s+(\S+)\s+(.{25})\s+([\d,.]+)?\s*([\d,.]+)?\s+(\d+)\s*$/', $line, $matches)) {
-                // Se houver uma movimentação pendente, salva ela primeiro
-                if ($pendingMovimentacao) {
-                    $this->salvarMovimentacao($pendingMovimentacao);
+                // Ler a próxima linha para obter a data/hora
+                $nextLine = trim(fgets($file));
+                $dataHora = null;
+
+                if (preg_match('/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/', $nextLine, $dateMatches)) {
+                    $dataHora = Carbon::createFromFormat('d/m/Y H:i', trim($dateMatches[1]));
                 }
 
-                $pendingMovimentacao = [
-                    'cooperativa' => $currentOrigin ? explode('/', $currentOrigin)[0] : null,
-                    'agencia' => $currentOrigin ? explode('/', $currentOrigin)[1] : null,
-                    'conta' => trim($matches[1]),
-                    'nome' => trim($matches[2]),
-                    'documento' => trim($matches[3]),
-                    'codigo' => trim($matches[4]),
-                    'descricao' => trim($matches[5]),
-                    'debito' => isset($matches[6]) ? $this->formatarValor($matches[6]) : null,
-                    'credito' => isset($matches[7]) ? $this->formatarValor($matches[7]) : null,
-                    'id_mov' => trim($matches[8]),
-                    'data_hora' => null
-                ];
-            }
-            // Captura da data/hora que está na linha seguinte
-            elseif ($pendingMovimentacao && preg_match('/^\s+(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/', trim($line), $matches)) {
-                $pendingMovimentacao['data_hora'] = Carbon::createFromFormat('d/m/Y H:i', trim($matches[1]));
-                $this->salvarMovimentacao($pendingMovimentacao);
-                $pendingMovimentacao = null;
-            }
-        }
+                try {
+                    Movimentacao::create([
+                        'cooperativa' => $currentOrigin ? explode('/', $currentOrigin)[0] : null,
+                        'agencia' => $currentOrigin ? explode('/', $currentOrigin)[1] : null,
+                        'conta' => trim($matches[1]),
+                        'nome' => trim($matches[2]),
+                        'documento' => trim($matches[3]),
+                        'codigo' => trim($matches[4]),
+                        'descricao' => trim($matches[5]),
+                        'debito' => isset($matches[6]) ? $this->formatarValor($matches[6]) : null,
+                        'credito' => isset($matches[7]) ? $this->formatarValor($matches[7]) : null,
+                        'id_mov' => trim($matches[8]),
+                        'data_hora' => $dataHora
+                    ]);
 
-        // Salvar última movimentação pendente se houver
-        if ($pendingMovimentacao) {
-            $this->salvarMovimentacao($pendingMovimentacao);
+                    Log::create([
+                        'acao' => 'Movimentação processada',
+                        'detalhes' => "Linha {$lineNumber}: Movimentação processada com sucesso"
+                    ]);
+
+                } catch (\Exception $e) {
+                    Log::create([
+                        'acao' => 'Erro na inserção',
+                        'detalhes' => "Erro ao inserir movimentação da linha {$lineNumber}: " . $e->getMessage()
+                    ]);
+                }
+            }
         }
 
         fclose($file);
 
         Log::create([
             'acao' => 'Fim do processamento',
-            'detalhes' => "Processamento do arquivo {$filename} concluído.",
+            'detalhes' => "Processamento do arquivo {$filename} concluído."
         ]);
 
         $this->info("Processamento do arquivo {$filename} concluído.");
@@ -96,23 +101,7 @@ class ProcessarArquivoETL extends Command
 
     private function formatarValor($valor)
     {
-        return floatval(str_replace(',', '.', str_replace('.', '', $valor)));
-    }
-
-    private function salvarMovimentacao($data)
-    {
-        try {
-            Log::create([
-                'acao' => 'Processando movimentação',
-                'detalhes' => json_encode($data),
-            ]);
-
-            Movimentacao::create($data);
-        } catch (\Exception $e) {
-            Log::create([
-                'acao' => 'Erro na inserção',
-                'detalhes' => "Erro ao inserir movimentação: " . $e->getMessage(),
-            ]);
-        }
+        if (empty($valor)) return null;
+        return floatval(str_replace(',', '.', str_replace('.', '', trim($valor))));
     }
 }
