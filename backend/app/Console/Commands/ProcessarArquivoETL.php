@@ -51,7 +51,7 @@ class ProcessarArquivoETL extends Command
             }
 
             // Captura dos dados da movimentação
-            if (preg_match('/^\s*(\d{5}-\d)\s+(.+?)\s+(\S+)\s+(\S+)\s+(.+?)\s+([\d,.]+)?\s*([\d,.]+)?\s+(\d+)\s*$/', $line, $matches)) {
+            if (preg_match('/^\s*(\d{5}-\d)\s+(.{25})\s+(\d+)\s+(\S+)\s+(.{25})\s+([\d,.]+)?\s*([\d,.]+)?\s+(\d+)\s*$/', $line, $matches)) {
                 // Se houver uma movimentação pendente, salva ela primeiro
                 if ($pendingMovimentacao) {
                     $this->salvarMovimentacao($pendingMovimentacao);
