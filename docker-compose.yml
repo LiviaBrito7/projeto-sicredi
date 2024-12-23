@@ -1,4 +1,15 @@
 services:
+  laravel:
+    build:
+      context: ./backend
+    container_name: laravel
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/var/www
+    networks:
+      - app-network
+
   vue-app:
     container_name: vue-app
     build: 
@@ -7,21 +18,20 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - frontend:/app
+      - /frontend:/app
       - /app/node_modules
-    
-  projeto-sicredi:
+
+  mysql:
     image: mysql:8.0
-    container_name: projeto-sicredi
+    container_name: mysql
     environment:
-      - MYSQL_DATABASE=sicredi-db
-      - MYSQL_USER=livia
-      - MYSQL_PASSWORD=livia
-      - MYSQL_ROOT_PASSWORD=root 
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: laravel
     ports:
       - "3306:3306"
-    volumes:
-      - projeto-sicredi-data:/var/lib/mysql
+    networks:
+      - app-network
 
-volumes:
-  projeto-sicredi-data:''
+networks:
+  app-network:
+    driver: bridge
