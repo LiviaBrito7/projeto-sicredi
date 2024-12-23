@@ -1,10 +1,10 @@
 <template>
-  <v-container>
+  <v-container class="pa-5">
     <v-row justify="center">
       <v-col cols="12" md="6">
-        <v-card>
-          <v-card-title>
-            <h2>File Upload</h2>
+        <v-card class="elevation-10 rounded-lg" outlined>
+          <v-card-title class="text-center">
+            <h2 class="display-1 font-weight-bold">File Upload</h2>
           </v-card-title>
           <v-card-text>
             <v-file-input
@@ -14,17 +14,32 @@
               outlined
               show-size
               @change="onFileChange"
+              class="mb-4"
+              clearable
+              prepend-icon="mdi-file-upload-outline"
+              placeholder="Escolha um arquivo"
             ></v-file-input>
 
-            <v-btn @click="uploadFiles" color="primary" :disabled="!selectedFiles || !selectedFiles.length">
-              Upload
+            <v-btn
+              @click="uploadFiles"
+              color="primary"
+              class="mb-2"
+              :disabled="!selectedFiles || !selectedFiles.length"
+              block
+            >
+              <v-icon left>mdi-upload</v-icon> Upload
             </v-btn>
 
-            <v-btn @click="processFile" color="secondary" :disabled="!selectedFiles || !selectedFiles.length">
-              Processar Arquivo
+            <v-btn
+              @click="processFile"
+              color="secondary"
+              :disabled="!selectedFiles || !selectedFiles.length"
+              block
+            >
+              <v-icon left>mdi-cogs</v-icon> Processar Arquivo
             </v-btn>
 
-            <div v-if="selectedFiles && selectedFiles.length > 0">
+            <div v-if="selectedFiles && selectedFiles.length > 0" class="mt-4">
               <div v-for="(progress, index) in fileUploadProgress" :key="index">
                 <v-progress-linear
                   :value="progress"
@@ -119,6 +134,17 @@ export default {
 
 <style scoped>
 .v-card {
-  padding: 20px;
+  padding: 30px;
+  box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.1);
+}
+.v-btn {
+  font-weight: bold;
+  text-transform: none;
+}
+.v-file-input {
+  border-radius: 8px;
+}
+.v-progress-linear {
+  border-radius: 10px;
 }
 </style>

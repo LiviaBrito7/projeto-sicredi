@@ -1,69 +1,92 @@
 <template>
   <v-container>
-    <v-card>
-      <v-card-title>
-        <h2>Métricas do Arquivo Processado</h2>
+    <v-card class="mx-auto" max-width="800px" outlined>
+      <v-card-title class="d-flex justify-space-between align-center">
+        <h2 class="headline font-weight-bold">Métricas do Arquivo Processado</h2>
+        <v-btn @click="fetchMetrics" color="primary" outlined>
+          Carregar Métricas
+        </v-btn>
       </v-card-title>
+
+      <v-divider></v-divider>
+
       <v-card-text>
         <div v-if="metrics">
           <!-- Movimentações por Data -->
-          <h3>Movimentações por Data</h3>
-          <p>
-            Maior: {{ metrics.maior_movimentacao.data || 'N/A' }} -
-            {{ metrics.maior_movimentacao.total || 0 }} movimentações
-          </p>
-          <p>
-            Menor: {{ metrics.menor_movimentacao.data || 'N/A' }} -
-            {{ metrics.menor_movimentacao.total || 0 }} movimentações
-          </p>
+          <v-row>
+            <v-col v-for="(item, index) in [
+              { title: 'Maior', data: metrics.maior_movimentacao },
+              { title: 'Menor', data: metrics.menor_movimentacao }
+            ]" :key="index" cols="12" sm="6">
+              <v-card elevation="2" class="pa-4 text-center">
+                <h3 class="subheading">{{ item.title }} Movimentação</h3>
+                <p><strong>Data:</strong> {{ item.data.data || 'N/A' }}</p>
+                <p><strong>Total:</strong> {{ item.data.total || 0 }} movimentações</p>
+              </v-card>
+            </v-col>
+          </v-row>
 
           <!-- Soma de Movimentações por Data -->
-          <h3>Soma de Movimentações por Data</h3>
-          <p>
-            Maior: {{ metrics.maior_soma.data || 'N/A' }} -
-            R$ {{ formatCurrency(metrics.maior_soma.total) }}
-          </p>
-          <p>
-            Menor: {{ metrics.menor_soma.data || 'N/A' }} -
-            R$ {{ formatCurrency(metrics.menor_soma.total) }}
-          </p>
+          <v-row>
+            <v-col v-for="(item, index) in [
+              { title: 'Maior', data: metrics.maior_soma },
+              { title: 'Menor', data: metrics.menor_soma }
+            ]" :key="index" cols="12" sm="6">
+              <v-card elevation="2" class="pa-4 text-center">
+                <h3 class="subheading">{{ item.title }} Soma</h3>
+                <p><strong>Data:</strong> {{ item.data.data || 'N/A' }}</p>
+                <p><strong>Total:</strong> R$ {{ formatCurrency(item.data.total) }}</p>
+              </v-card>
+            </v-col>
+          </v-row>
 
           <!-- Dia da Semana com Mais Movimentações -->
-          <h3>Dia da Semana com Mais Movimentações (RX1 e PX1)</h3>
-          <p>
-            Dia: {{ metrics.dia_semana_mais_movimentacoes.dia || 'N/A' }} -
-            {{ metrics.dia_semana_mais_movimentacoes.total || 0 }} movimentações
-          </p>
+          <v-card class="mt-4" elevation="2" outlined>
+            <v-card-title class="headline">Dia da Semana com Mais Movimentações (RX1 e PX1)</v-card-title>
+            <v-card-text class="text-center">
+              <p>
+                <strong>Dia:</strong> {{ metrics.dia_semana_mais_movimentacoes.dia || 'N/A' }}<br />
+                <strong>Total:</strong> {{ metrics.dia_semana_mais_movimentacoes.total || 0 }} movimentações
+              </p>
+            </v-card-text>
+          </v-card>
 
           <!-- Movimentações por Coop/Agência -->
-          <h3>Movimentações por Coop/Agência</h3>
-          <v-list>
-            <v-list-item-group>
-              <v-list-item
-                v-for="(item, index) in metrics.movimentacoes_por_coop_agencia || []"
-                :key="index"
-              >
-                <v-list-item-content>
-                  <v-list-item-title>
-                    {{ item.cooperativa }} - {{ item.agencia }}
-                  </v-list-item-title>
-                  <v-list-item-subtitle>
-                    {{ item.total_movimentacoes }} movimentações -
-                    R$ {{ formatCurrency(item.total_valor) }}
-                  </v-list-item-subtitle>
-                </v-list-item-content>
-              </v-list-item>
-            </v-list-item-group>
-          </v-list>
+          <v-card class="mt-4" elevation="2" outlined>
+            <v-card-title class="headline">Movimentações por Coop/Agência</v-card-title>
+            <v-card-text>
+              <v-list>
+                <v-list-item-group>
+                  <v-list-item
+                    v-for="(item, index) in metrics.movimentacoes_por_coop_agencia || []"
+                    :key="index"
+                    class="pa-2"
+                  >
+                    <v-list-item-content>
+                      <v-list-item-title class="font-weight-bold">
+                        {{ item.cooperativa }} - {{ item.agencia }}
+                      </v-list-item-title>
+                      <v-list-item-subtitle>
+                        {{ item.total_movimentacoes }} movimentações - R$ {{ formatCurrency(item.total_valor) }}
+                      </v-list-item-subtitle>
+                    </v-list-item-content>
+                  </v-list-item>
+                </v-list-item-group>
+              </v-list>
+            </v-card-text>
+          </v-card>
 
-          <!-- Relação de Créditos x Débitos -->
-          <h3>Relação de Créditos x Débitos ao Longo das Horas do Dia</h3>
-          <apexchart
-            :options="creditDebitChartOptions"
-            :series="creditDebitChartData"
-          />
+          <!-- Gráfico de Créditos x Débitos -->
+          <v-card class="mt-4" elevation="2" outlined>
+            <v-card-title class="headline">Relação de Créditos x Débitos ao Longo das Horas do Dia</v-card-title>
+            <v-card-text>
+              <apexchart
+                :options="creditDebitChartOptions"
+                :series="creditDebitChartData"
+              />
+            </v-card-text>
+          </v-card>
         </div>
-        <v-btn @click="fetchMetrics" color="primary">Carregar Métricas</v-btn>
       </v-card-text>
     </v-card>
   </v-container>
@@ -186,9 +209,37 @@ export default {
 <style scoped>
 .v-card {
   padding: 20px;
+  margin-bottom: 20px;
+}
+
+.v-card-title {
+  font-weight: bold;
+}
+
+.v-divider {
+  margin: 20px 0;
 }
 
 h3 {
   margin-top: 20px;
+}
+
+.subheading {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.v-btn {
+  text-transform: none;
+  font-weight: 500;
+}
+
+.v-list-item-content {
+  padding: 8px 0;
+}
+
+.apexcharts-canvas {
+  background: #f5f5f5;
+  border-radius: 8px;
 }
 </style>
