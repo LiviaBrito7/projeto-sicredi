@@ -13,25 +13,30 @@ services:
   vue-app:
     container_name: vue-app
     build: 
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "5173:5173"
     volumes:
-      - /frontend:/app
+      - .:/app
       - /app/node_modules
-
-  mysql:
+    
+  projeto-sicredi:
     image: mysql:8.0
-    container_name: mysql
+    container_name: projeto-sicredi
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: laravel
+      - MYSQL_DATABASE=sicredi-db
+      - MYSQL_USER=livia
+      - MYSQL_PASSWORD=livia
+      - MYSQL_ROOT_PASSWORD=root 
     ports:
       - "3306:3306"
-    networks:
-      - app-network
-
+    volumes:
+      - projeto-sicredi-data:/var/lib/mysql
+      
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  projeto-sicredi-data:

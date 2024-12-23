@@ -11,7 +11,7 @@ import FileUpload from '../components/FileUpload.vue';
 import Metrics from '../components/Metrics.vue';
 
 export default defineComponent({
-  name: 'Dashboard',
+  name: 'Home',
   components: {
     FileUpload,
     Metrics,
@@ -19,6 +19,4 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-/* Adicione estilos personalizados aqui, se necessário */
-</style>
+

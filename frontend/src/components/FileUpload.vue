@@ -75,7 +75,7 @@ export default {
     };
 
     const uploadFiles = async () => {
-      const chunkSize = 1024 * 1024; // 1MB
+      const chunkSize = 1024 * 1024; 
 
       for (let fileIndex = 0; fileIndex < selectedFiles.value.length; fileIndex++) {
         const file = selectedFiles.value[fileIndex];
@@ -109,7 +109,7 @@ export default {
 
     const processFile = async () => {
       if (selectedFiles.value.length > 0) {
-        const filename = selectedFiles.value[0].name; // Pega o nome do primeiro arquivo
+        const filename = selectedFiles.value[0].name;
         try {
           const response = await axios.post(`/processar/etl`, { filename });
           console.log(response.data);
